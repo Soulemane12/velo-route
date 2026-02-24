@@ -1,0 +1,15 @@
+{
+  "gridStep": 0.002,
+  "weights": {
+    "crashDensity": 0.4,
+    "roadClassPenalty": 0.25,
+    "bikeLanePenalty": 0.25,
+    "continuityPenalty": 0.1
+  },
+  "intersectionLambda": 0.08,
+  "normalization": {
+    "routeRawMin": 0.05,
+    "routeRawMax": 2.5
+  },
+  "intersectionSearchRadiusDeg": 0.0003
+}
