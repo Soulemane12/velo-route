@@ -37,7 +37,7 @@ export async function GET() {
     const lat = (parseInt(latIdxStr) + 0.5) * gridStep;
     const lng = (parseInt(lngIdxStr) + 0.5) * gridStep;
 
-    if (cell.crashDensity > 0.05) {
+    if (cell.crashDensity > 0.01) {
       crashFeatures.push({
         type: "Feature",
         geometry: { type: "Point", coordinates: [lng, lat] },
@@ -45,7 +45,7 @@ export async function GET() {
       });
     }
 
-    if ((cell.crimeDensity ?? 0) > 0.05) {
+    if ((cell.crimeDensity ?? 0) > 0.01) {
       crimeFeatures.push({
         type: "Feature",
         geometry: { type: "Point", coordinates: [lng, lat] },

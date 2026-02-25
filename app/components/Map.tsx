@@ -109,6 +109,9 @@ export default function Map({
         if (map.getSource(id)) map.removeSource(id);
       }
 
+      // Find first route layer to insert heatmaps beneath it (fallback: top)
+      const firstRouteLayer = layerIds.current[0];
+
       if (showCrash) {
         map.addSource("heatmap-crashes", { type: "geojson", data: data.crashes as never });
         map.addLayer({
@@ -117,12 +120,12 @@ export default function Map({
           source: "heatmap-crashes",
           paint: {
             "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 1, 1],
-            "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.6, 15, 1.5],
+            "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 15, 2],
             "heatmap-color": CRASH_COLOR as never,
-            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 12, 14, 20],
-            "heatmap-opacity": 0.75,
+            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 15, 14, 25],
+            "heatmap-opacity": 0.8,
           },
-        }, "road-label");
+        }, firstRouteLayer);
       }
 
       if (showCrime) {
@@ -133,12 +136,12 @@ export default function Map({
           source: "heatmap-crimes",
           paint: {
             "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 1, 1],
-            "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.6, 15, 1.5],
+            "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.8, 15, 2],
             "heatmap-color": CRIME_COLOR as never,
-            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 12, 14, 20],
-            "heatmap-opacity": 0.7,
+            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 15, 14, 25],
+            "heatmap-opacity": 0.75,
           },
-        }, "road-label");
+        }, firstRouteLayer);
       }
     };
 
