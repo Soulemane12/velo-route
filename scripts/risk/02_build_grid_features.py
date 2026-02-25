@@ -59,6 +59,16 @@ def bike_penalty(row):
     return 0.8
 
 
+CRIME_SEVERITY = {
+    "ROBBERY": 2.5,
+    "FELONY ASSAULT": 2.0,
+    "ASSAULT 3 & RELATED OFFENSES": 1.5,
+    "GRAND LARCENY": 1.0,
+    "GRAND LARCENY OF MOTOR VEHICLE": 0.8,
+    "BURGLARY": 0.8,
+}
+
+
 def main():
     # ── 1. Load + filter crashes ─────────────────────────────────────────────
     print("Loading crash data...")
@@ -183,10 +193,55 @@ def main():
     grid["bike_lane_penalty"] = grid["bike_lane_penalty"].fillna(0.8)
     grid["bike_coverage"] = grid["bike_coverage"].fillna(0.0)
 
-    # ── 6. Normalize crash density ───────────────────────────────────────────
+    # ── 6. Load + join crime data ─────────────────────────────────────────────
+    crime_path = os.path.join(RAW_DIR, "nyc_crimes.csv")
+    if os.path.exists(crime_path):
+        print("Loading crime data...")
+        cdf = pd.read_csv(crime_path, low_memory=False)
+        cdf.columns = [c.strip().upper() for c in cdf.columns]
+
+        cdf = cdf.dropna(subset=["LATITUDE", "LONGITUDE"])
+        cdf["LATITUDE"] = pd.to_numeric(cdf["LATITUDE"], errors="coerce")
+        cdf["LONGITUDE"] = pd.to_numeric(cdf["LONGITUDE"], errors="coerce")
+        cdf = cdf.dropna(subset=["LATITUDE", "LONGITUDE"])
+        cdf = cdf[(cdf["LATITUDE"] != 0) & (cdf["LONGITUDE"] != 0)]
+
+        # Severity weight by offense type
+        offense_col = "OFNS_DESC" if "OFNS_DESC" in cdf.columns else None
+        if offense_col:
+            cdf["CRIME_W"] = cdf[offense_col].str.upper().map(CRIME_SEVERITY).fillna(0.5)
+        else:
+            cdf["CRIME_W"] = 1.0
+
+        crimes = gpd.GeoDataFrame(
+            cdf,
+            geometry=gpd.points_from_xy(cdf["LONGITUDE"], cdf["LATITUDE"]),
+            crs=CRS_WGS84,
+        ).to_crs(CRS_PROJ)
+        print(f"  Loaded crimes: {len(crimes):,}")
+
+        crime_join = gpd.sjoin(
+            crimes[["CRIME_W", "geometry"]],
+            grid[["cell_id", "geometry"]],
+            predicate="within",
+            how="inner",
+        )
+        crime_agg = crime_join.groupby("cell_id")["CRIME_W"].sum().rename("crime_w_sum")
+        grid = grid.merge(crime_agg, on="cell_id", how="left")
+        grid["crime_w_sum"] = grid["crime_w_sum"].fillna(0.0)
+        print(f"  Cells with crime data: {(grid['crime_w_sum'] > 0).sum():,}")
+    else:
+        print("No crime data found — skipping (run 00b_download_crimes.py first)")
+        grid["crime_w_sum"] = 0.0
+
+    # ── 7. Normalize crash + crime density ───────────────────────────────────
     p95 = grid["crash_w_sum"].quantile(0.95)
     denom = max(p95, 1.0)
     grid["crash_density_norm"] = (grid["crash_w_sum"].clip(upper=p95) / denom).clip(0, 1)
+
+    p95_crime = grid["crime_w_sum"].quantile(0.95)
+    denom_crime = max(p95_crime, 1.0)
+    grid["crime_density_norm"] = (grid["crime_w_sum"].clip(upper=p95_crime) / denom_crime).clip(0, 1)
 
     # ── 7. Add WGS84 centroid for runtime lookup ─────────────────────────────
     centroids = grid.geometry.centroid.to_crs(CRS_WGS84)
@@ -198,11 +253,14 @@ def main():
     grid.to_parquet(out)
 
     non_empty = grid[grid["crash_w_sum"] > 0]
+    non_empty_crime = grid[grid["crime_w_sum"] > 0]
     print(f"  Cells with crashes: {len(non_empty):,}")
+    print(f"  Cells with crimes:  {len(non_empty_crime):,}")
     print(f"  Saved: {out}")
-    print(f"  Crash density p95: {p95:.2f}")
-    print(f"  Road penalty mean: {grid['road_class_penalty'].mean():.3f}")
-    print(f"  Bike penalty mean: {grid['bike_lane_penalty'].mean():.3f}")
+    print(f"  Crash density p95:  {p95:.2f}")
+    print(f"  Crime density p95:  {p95_crime:.2f}")
+    print(f"  Road penalty mean:  {grid['road_class_penalty'].mean():.3f}")
+    print(f"  Bike penalty mean:  {grid['bike_lane_penalty'].mean():.3f}")
 
 
 if __name__ == "__main__":

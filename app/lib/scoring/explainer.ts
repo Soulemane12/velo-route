@@ -10,6 +10,8 @@ export function computeMetrics(output: ScoringOutput): RouteMetrics {
   return {
     pctHighCrashCells:
       output.samples.filter((s) => s.cell.crashDensity > 0.5).length / n,
+    pctHighCrimeCells:
+      output.samples.filter((s) => (s.cell.crimeDensity ?? 0) > 0.5).length / n,
     pctMajorRoadCells:
       output.samples.filter((s) => s.cell.roadClassPenalty > 0.6).length / n,
     pctPoorBikeInfraCells:
@@ -70,6 +72,17 @@ export function generateReasonDetails(
     details.push({
       code: "high_crash_density",
       label: `${pct}% through high crash-density areas`,
+      severity: pct > 50 ? "high" : pct > 30 ? "medium" : "low",
+      value: pct,
+      unit: "%",
+    });
+  }
+
+  if ((metrics.pctHighCrimeCells ?? 0) > 0.15) {
+    const pct = Math.round((metrics.pctHighCrimeCells ?? 0) * 100);
+    details.push({
+      code: "high_crime_density",
+      label: `${pct}% through elevated crime areas`,
       severity: pct > 50 ? "high" : pct > 30 ? "medium" : "low",
       value: pct,
       unit: "%",

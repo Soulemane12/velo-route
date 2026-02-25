@@ -60,12 +60,15 @@ export function buildSegments(
       const reasons: string[] = [];
       const avgCrash =
         chunk.reduce((s, c) => s + c.cell.crashDensity, 0) / chunk.length;
+      const avgCrime =
+        chunk.reduce((s, c) => s + (c.cell.crimeDensity ?? 0), 0) / chunk.length;
       const avgRoad =
         chunk.reduce((s, c) => s + c.cell.roadClassPenalty, 0) / chunk.length;
       const avgBike =
         chunk.reduce((s, c) => s + c.cell.bikeLanePenalty, 0) / chunk.length;
 
       if (avgCrash > 0.5) reasons.push("high crash density");
+      if (avgCrime > 0.5) reasons.push("elevated crime area");
       if (avgRoad > 0.6) reasons.push("major road segment");
       if (avgBike > 0.6) reasons.push("poor bike infrastructure");
       if (reasons.length === 0) reasons.push("standard residential street");

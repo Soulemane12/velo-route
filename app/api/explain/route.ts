@@ -11,6 +11,7 @@ function buildPrompt(route: Route, routeIndex: number, totalRoutes: number): str
   const dataLines = m
     ? [
         `Crash-dense segments: ${Math.round(m.pctHighCrashCells * 100)}% of route`,
+        `Elevated crime segments: ${Math.round((m.pctHighCrimeCells ?? 0) * 100)}% of route`,
         `Major road exposure: ${Math.round(m.pctMajorRoadCells * 100)}%`,
         `Poor bike infrastructure: ${Math.round(m.pctPoorBikeInfraCells * 100)}%`,
         `Complex intersections nearby: ${m.complexIntersectionCount}`,

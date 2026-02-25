@@ -9,6 +9,7 @@ import { join } from "path";
 
 export interface CellFeatures {
   crashDensity: number;
+  crimeDensity: number;
   roadClassPenalty: number;
   bikeLanePenalty: number;
   bikeCoverage: number;
@@ -31,6 +32,7 @@ export interface ScoringConfig {
   gridStep: number;
   weights: {
     crashDensity: number;
+    crimeDensity: number;
     roadClassPenalty: number;
     bikeLanePenalty: number;
     continuityPenalty: number;
@@ -109,6 +111,7 @@ function lookupCell(lat: number, lng: number): CellFeatures {
   const key = cellKey(lat, lng, _grid.gridStep);
   return _grid.cells[key] ?? {
     crashDensity: 0,
+    crimeDensity: 0,
     roadClassPenalty: 0.5,
     bikeLanePenalty: 0.8,
     bikeCoverage: 0,
@@ -194,6 +197,7 @@ export function scoreGeometry(coords: [number, number][]): ScoringOutput {
     const cell = lookupCell(lat, lng);
     const segmentRisk =
       w.crashDensity * cell.crashDensity +
+      (w.crimeDensity ?? 0) * (cell.crimeDensity ?? 0) +
       w.roadClassPenalty * cell.roadClassPenalty +
       w.bikeLanePenalty * cell.bikeLanePenalty;
     return { lat, lng, coordIdx, cell, segmentRisk };

@@ -22,6 +22,7 @@ export type RouteRiskReasonCode =
   | "major_arterials_share"
   | "bike_lane_discontinuities"
   | "high_crash_density"
+  | "high_crime_density"
   | "poor_bike_infra_share"
   | "turn_frequency"
   | "night_penalty";
@@ -51,6 +52,7 @@ export interface RouteSegment {
 
 export interface RouteMetrics {
   pctHighCrashCells: number;
+  pctHighCrimeCells: number;
   pctMajorRoadCells: number;
   pctPoorBikeInfraCells: number;
   complexIntersectionCount: number;

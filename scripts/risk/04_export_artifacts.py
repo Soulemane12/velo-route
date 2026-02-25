@@ -25,12 +25,15 @@ def main():
     print("Exporting risk grid...")
     grid = gpd.read_parquet(os.path.join(PROC_DIR, "grid_features.parquet"))
 
+    has_crime = "crime_density_norm" in grid.columns
+
     # Build lookup keyed by quantized lat/lng of centroid
     cells = {}
     for _, row in grid.iterrows():
-        # Skip empty cells (no crashes, default penalties)
+        # Skip empty cells (no crashes, default penalties, no crime)
         if row["crash_w_sum"] == 0 and row["road_class_penalty"] == 0.5:
-            continue
+            if not has_crime or row.get("crime_w_sum", 0) == 0:
+                continue
 
         lat = row["centroid_lat"]
         lng = row["centroid_lng"]
@@ -40,6 +43,7 @@ def main():
 
         cells[key] = {
             "crashDensity": round(float(row["crash_density_norm"]), 4),
+            "crimeDensity": round(float(row["crime_density_norm"]), 4) if has_crime else 0.0,
             "roadClassPenalty": round(float(row["road_class_penalty"]), 4),
             "bikeLanePenalty": round(float(row["bike_lane_penalty"]), 4),
             "bikeCoverage": round(float(row["bike_coverage"]), 4),
@@ -83,10 +87,11 @@ def main():
     config = {
         "gridStep": GRID_STEP,
         "weights": {
-            "crashDensity": 0.40,
-            "roadClassPenalty": 0.25,
-            "bikeLanePenalty": 0.25,
-            "continuityPenalty": 0.10,
+            "crashDensity": 0.35,
+            "crimeDensity": 0.15,
+            "roadClassPenalty": 0.22,
+            "bikeLanePenalty": 0.22,
+            "continuityPenalty": 0.06,
         },
         "intersectionLambda": 0.08,
         "normalization": {
