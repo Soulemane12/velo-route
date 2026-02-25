@@ -28,6 +28,9 @@ export default function MapPage() {
   const recommendAbort = useRef<AbortController | null>(null);
   const autoSelectedRef = useRef(false);
 
+  // Waypoint route generation
+  const [waypointLoading, setWaypointLoading] = useState(false);
+
   async function findRoutes() {
     if (!origin || !destination) return;
     setLoading(true);
@@ -45,6 +48,92 @@ export default function MapPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Runs the recommendation API with an explicit routes array + message,
+  // bypassing the useEffect closure so we always use the freshest data.
+  function fireRecommendation(liveRoutes: Route[], msg: string) {
+    recommendAbort.current?.abort();
+    const ctrl = new AbortController();
+    recommendAbort.current = ctrl;
+    autoSelectedRef.current = false;
+    setRecommendationText("");
+    setRecommendationLoading(true);
+
+    (async () => {
+      try {
+        const res = await fetch("/api/recommend", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ routes: liveRoutes, concerns: msg }),
+          signal: ctrl.signal,
+        });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          accumulated += decoder.decode(value, { stream: true });
+          setRecommendationText(accumulated);
+          if (!autoSelectedRef.current) {
+            const match = accumulated.match(/Route\s+([1-4])/i);
+            if (match) {
+              const rec = liveRoutes[parseInt(match[1]) - 1];
+              if (rec) { setSelectedRouteId(rec.id); autoSelectedRef.current = true; }
+            }
+          }
+        }
+      } catch (e) {
+        if ((e as Error).name !== "AbortError")
+          setRecommendationText("Could not load recommendation.");
+      } finally {
+        setRecommendationLoading(false);
+      }
+    })();
+  }
+
+  async function handleChatSend(message: string) {
+    // Clear case — wipe concerns and any via-route
+    if (!message.trim()) {
+      setConcerns("");
+      setRoutes((prev) => prev.filter((r) => !r.id.startsWith("via-")));
+      return;
+    }
+
+    if (!origin || !destination) {
+      setConcerns(message);
+      return;
+    }
+
+    setWaypointLoading(true);
+    // Build the final routes array explicitly so we can pass it
+    // directly to the recommendation (avoids React closure timing issues)
+    let finalRoutes = routes.filter((r) => !r.id.startsWith("via-"));
+
+    try {
+      const res = await fetch("/api/waypoint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ origin, destination, message }),
+      });
+      const data = await res.json();
+      if (data.ok && data.route) {
+        finalRoutes = [...finalRoutes, data.route];
+        setRoutes(finalRoutes);
+        setSelectedRouteId(data.route.id);
+      }
+    } catch {
+      // fall through with original routes
+    } finally {
+      setWaypointLoading(false);
+    }
+
+    // Update UI concerns display and fire recommendation with the
+    // EXPLICIT finalRoutes (guaranteed to include any via-route)
+    setConcerns(message);
+    fireRecommendation(finalRoutes, message);
   }
 
   function clear() {
@@ -105,64 +194,20 @@ export default function MapPage() {
     return () => ctrl.abort();
   }, [selectedRouteId, routes]);
 
-  // ── Recommendation (fires when routes load OR when concerns is submitted) ─
+  // ── Recommendation (fires on initial route load only — no concerns yet) ──
+  // Chat-triggered recommendations go through fireRecommendation() directly
+  // so they always receive the freshest routes array.
   useEffect(() => {
     if (routes.length === 0) {
       setRecommendationText("");
       return;
     }
+    // Skip if the user already has an active concern — handled by fireRecommendation
+    if (concerns.trim()) return;
 
-    recommendAbort.current?.abort();
-    const ctrl = new AbortController();
-    recommendAbort.current = ctrl;
-    autoSelectedRef.current = false;
-
-    setRecommendationText("");
-    setRecommendationLoading(true);
-
-    (async () => {
-      try {
-        const res = await fetch("/api/recommend", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ routes, concerns }),
-          signal: ctrl.signal,
-        });
-        if (!res.ok || !res.body) return;
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let accumulated = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          accumulated += decoder.decode(value, { stream: true });
-          setRecommendationText(accumulated);
-
-          // Auto-select the recommended route as soon as we see "Route N"
-          if (!autoSelectedRef.current) {
-            const match = accumulated.match(/Route\s+([123])/i);
-            if (match) {
-              const rec = routes[parseInt(match[1]) - 1];
-              if (rec) {
-                setSelectedRouteId(rec.id);
-                autoSelectedRef.current = true;
-              }
-            }
-          }
-        }
-      } catch (e) {
-        if ((e as Error).name !== "AbortError")
-          setRecommendationText("Could not load recommendation.");
-      } finally {
-        setRecommendationLoading(false);
-      }
-    })();
-
-    return () => ctrl.abort();
+    fireRecommendation(routes, "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [routes, concerns]);
+  }, [routes]);
 
   return (
     <div className="flex h-full w-full">
@@ -193,9 +238,10 @@ export default function MapPage() {
         {/* Chat input — only shown once routes are loaded */}
         {routes.length > 0 && (
           <RouteChat
-            onSend={setConcerns}
+            onSend={handleChatSend}
             lastMessage={concerns}
-            loading={recommendationLoading}
+            loading={waypointLoading || recommendationLoading}
+            waypointLoading={waypointLoading}
           />
         )}
       </aside>

@@ -6,9 +6,10 @@ interface Props {
   onSend: (message: string) => void;
   lastMessage: string;
   loading: boolean;
+  waypointLoading?: boolean;
 }
 
-export default function RouteChat({ onSend, lastMessage, loading }: Props) {
+export default function RouteChat({ onSend, lastMessage, loading, waypointLoading }: Props) {
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -46,8 +47,19 @@ export default function RouteChat({ onSend, lastMessage, loading }: Props) {
         </span>
       </div>
 
+      {/* Waypoint building status */}
+      {waypointLoading && (
+        <div className="flex items-center gap-2 rounded-lg bg-violet-500/10 border border-violet-500/20 px-2.5 py-1.5">
+          <svg className="w-3 h-3 text-violet-400 animate-spin shrink-0" viewBox="0 0 24 24" fill="none">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+          </svg>
+          <span className="text-xs text-violet-400">Building new route…</span>
+        </div>
+      )}
+
       {/* Last sent message */}
-      {lastMessage && (
+      {lastMessage && !waypointLoading && (
         <div className="flex items-center gap-2 rounded-lg bg-zinc-800/60 border border-zinc-700/50 px-2.5 py-1.5">
           <span className="flex-1 text-xs text-zinc-300 italic truncate">
             &ldquo;{lastMessage}&rdquo;

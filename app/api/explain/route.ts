@@ -18,12 +18,17 @@ function buildPrompt(route: Route, routeIndex: number, totalRoutes: number): str
       ].join("\n")
     : "";
 
-  return `Route ${routeIndex + 1} of ${totalRoutes} — ${route.riskLevel} risk (score ${route.riskScore}/100)
+  const viaTag = route.via ? ` [custom route via ${route.via}]` : "";
+  const instruction = route.via
+    ? `In 1-2 sentences max: highlight what makes this detour worthwhile and one thing to watch for along the way. Keep it encouraging.`
+    : `In 1-2 sentences max: state the main risk and one actionable tip. Be blunt and specific.`;
+
+  return `Route ${routeIndex + 1} of ${totalRoutes}${viaTag} — ${route.riskLevel} risk (score ${route.riskScore}/100)
 Duration: ${duration} · Distance: ${distance}
 Risk factors: ${route.reasons.join("; ")}
 ${dataLines}
 
-In 1-2 sentences max: state the main risk and one actionable tip. Be blunt and specific.`;
+${instruction}`;
 }
 
 export async function POST(req: Request) {
@@ -39,8 +44,9 @@ export async function POST(req: Request) {
   const stream = client.messages.stream({
     model: "claude-haiku-4-5-20251001",
     max_tokens: 80,
-    system:
-      "You are a blunt NYC cycling safety analyst. One or two sentences only — no more. State the biggest risk and one tip. No bullet points, no fluff.",
+    system: route.via
+      ? "You are a helpful NYC cycling guide. One or two sentences only — no more. Be encouraging and practical, not scary. No bullet points, no fluff."
+      : "You are a blunt NYC cycling safety analyst. One or two sentences only — no more. State the biggest risk and one tip. No bullet points, no fluff.",
     messages: [{ role: "user", content: buildPrompt(route, routeIndex, totalRoutes) }],
   });
 

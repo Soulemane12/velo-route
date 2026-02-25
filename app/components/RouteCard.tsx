@@ -54,7 +54,14 @@ export default function RouteCard({
         <div className="flex-1 min-w-0">
           {/* Title row */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-sm font-semibold text-white">Route {index + 1}</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-semibold text-white shrink-0">Route {index + 1}</span>
+              {route.via && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-violet-500/15 text-violet-400 truncate">
+                  via {route.via}
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-xs text-zinc-500">{route.riskScore}</span>
               <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${styles.badge}`}>

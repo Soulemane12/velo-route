@@ -73,6 +73,7 @@ export interface Route {
   segments: RouteSegment[];
   metrics?: RouteMetrics;
   provider?: "mapbox";
+  via?: string; // waypoint place name, e.g. "Johnny's Cafe"
 }
 
 // ── Response ────────────────────────────────────────────────────────────────
