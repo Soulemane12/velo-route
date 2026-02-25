@@ -14,10 +14,10 @@ interface DemoPreset {
 
 const DEMO_PRESETS: DemoPreset[] = [
   {
-    label: "UES → 116th & Broadway",
+    label: "Chick-fil-A → Columbia University",
     kind: "risk",
     originText: "Chick-fil-A, 1536 3rd Ave",
-    destText: "116th St & Broadway",
+    destText: "Columbia University",
     origin: [-73.951872, 40.777412],
     destination: [-73.960678, 40.807537],
   },
