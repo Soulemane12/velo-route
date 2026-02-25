@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { Route } from "@/app/types";
 
@@ -20,6 +20,33 @@ interface Props {
   onMapClick: (lngLat: [number, number]) => void;
 }
 
+type HeatmapData = {
+  crashes: object;
+  crimes: object;
+};
+
+const CRASH_COLOR = [
+  "interpolate",
+  ["linear"],
+  ["heatmap-density"],
+  0, "rgba(0,0,0,0)",
+  0.2, "rgba(254,224,144,0.5)",
+  0.5, "rgba(253,141,60,0.65)",
+  0.8, "rgba(240,59,32,0.8)",
+  1, "rgba(189,0,38,0.9)",
+];
+
+const CRIME_COLOR = [
+  "interpolate",
+  ["linear"],
+  ["heatmap-density"],
+  0, "rgba(0,0,0,0)",
+  0.2, "rgba(213,183,250,0.5)",
+  0.5, "rgba(147,51,234,0.65)",
+  0.8, "rgba(109,40,217,0.8)",
+  1, "rgba(76,29,149,0.9)",
+];
+
 export default function Map({
   routes,
   selectedRouteId,
@@ -31,6 +58,11 @@ export default function Map({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const layerIds = useRef<string[]>([]);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const heatmapDataRef = useRef<HeatmapData | null>(null);
+
+  const [showCrash, setShowCrash] = useState(false);
+  const [showCrime, setShowCrime] = useState(false);
+  const [heatmapLoading, setHeatmapLoading] = useState(false);
 
   // Initialize map
   useEffect(() => {
@@ -62,6 +94,87 @@ export default function Map({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Fetch + apply heatmap layers
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const applyHeatmaps = (data: HeatmapData) => {
+      // Remove existing heatmap layers/sources
+      for (const id of ["heatmap-crashes-layer", "heatmap-crimes-layer"]) {
+        if (map.getLayer(id)) map.removeLayer(id);
+      }
+      for (const id of ["heatmap-crashes", "heatmap-crimes"]) {
+        if (map.getSource(id)) map.removeSource(id);
+      }
+
+      if (showCrash) {
+        map.addSource("heatmap-crashes", { type: "geojson", data: data.crashes as never });
+        map.addLayer({
+          id: "heatmap-crashes-layer",
+          type: "heatmap",
+          source: "heatmap-crashes",
+          paint: {
+            "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 1, 1],
+            "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.6, 15, 1.5],
+            "heatmap-color": CRASH_COLOR as never,
+            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 12, 14, 20],
+            "heatmap-opacity": 0.75,
+          },
+        }, "road-label");
+      }
+
+      if (showCrime) {
+        map.addSource("heatmap-crimes", { type: "geojson", data: data.crimes as never });
+        map.addLayer({
+          id: "heatmap-crimes-layer",
+          type: "heatmap",
+          source: "heatmap-crimes",
+          paint: {
+            "heatmap-weight": ["interpolate", ["linear"], ["get", "intensity"], 0, 0, 1, 1],
+            "heatmap-intensity": ["interpolate", ["linear"], ["zoom"], 10, 0.6, 15, 1.5],
+            "heatmap-color": CRIME_COLOR as never,
+            "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 10, 12, 14, 20],
+            "heatmap-opacity": 0.7,
+          },
+        }, "road-label");
+      }
+    };
+
+    const run = async () => {
+      if (!showCrash && !showCrime) {
+        // Remove both
+        for (const id of ["heatmap-crashes-layer", "heatmap-crimes-layer"]) {
+          if (map.getLayer(id)) map.removeLayer(id);
+        }
+        for (const id of ["heatmap-crashes", "heatmap-crimes"]) {
+          if (map.getSource(id)) map.removeSource(id);
+        }
+        return;
+      }
+
+      if (!heatmapDataRef.current) {
+        setHeatmapLoading(true);
+        try {
+          const res = await fetch("/api/heatmap");
+          heatmapDataRef.current = await res.json();
+        } catch {
+          setHeatmapLoading(false);
+          return;
+        }
+        setHeatmapLoading(false);
+      }
+
+      if (map.isStyleLoaded()) {
+        applyHeatmaps(heatmapDataRef.current!);
+      } else {
+        map.once("load", () => applyHeatmaps(heatmapDataRef.current!));
+      }
+    };
+
+    run();
+  }, [showCrash, showCrime]);
 
   // Draw routes
   useEffect(() => {
@@ -104,7 +217,6 @@ export default function Map({
       const selected = routes.find((r) => r.id === selectedRouteId);
 
       if (selected && selected.segments.length > 0) {
-        // Each segment has its own geometry — use it directly
         const features = selected.segments.map((seg) => ({
           type: "Feature" as const,
           properties: { color: riskColor(seg.risk), risk: seg.risk },
@@ -199,5 +311,42 @@ export default function Map({
     place();
   }, [origin, destination]);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  return (
+    <div className="relative w-full h-full">
+      <div ref={containerRef} className="w-full h-full" />
+
+      {/* Heatmap toggles */}
+      <div className="absolute bottom-8 left-3 flex flex-col gap-1.5 z-10">
+        <button
+          onClick={() => setShowCrash((v) => !v)}
+          disabled={heatmapLoading}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all shadow-sm ${
+            showCrash
+              ? "bg-red-500/20 border-red-500/50 text-red-300"
+              : "bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full shrink-0 ${showCrash ? "bg-red-400" : "bg-zinc-600"}`} />
+          Crash zones
+        </button>
+
+        <button
+          onClick={() => setShowCrime((v) => !v)}
+          disabled={heatmapLoading}
+          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-all shadow-sm ${
+            showCrime
+              ? "bg-violet-500/20 border-violet-500/50 text-violet-300"
+              : "bg-zinc-900/80 border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+          }`}
+        >
+          <span className={`w-2 h-2 rounded-full shrink-0 ${showCrime ? "bg-violet-400" : "bg-zinc-600"}`} />
+          Crime zones
+        </button>
+
+        {heatmapLoading && (
+          <p className="text-[10px] text-zinc-500 px-1">Loading…</p>
+        )}
+      </div>
+    </div>
+  );
 }
