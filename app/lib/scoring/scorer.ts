@@ -41,6 +41,8 @@ export interface ScoringConfig {
   normalization: {
     routeRawMin: number;
     routeRawMax: number;
+    statenIslandRawMin?: number;
+    statenIslandRawMax?: number;
   };
   intersectionSearchRadiusDeg: number;
 }
@@ -102,6 +104,17 @@ export function getArtifactStats() {
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
+
+const SI_BOUNDS = { latMin: 40.47, latMax: 40.66, lngMin: -74.27, lngMax: -74.03 };
+
+function isStatenIsland(coords: [number, number][]): boolean {
+  if (coords.length === 0) return false;
+  const inSI = coords.filter(([lng, lat]) =>
+    lat >= SI_BOUNDS.latMin && lat <= SI_BOUNDS.latMax &&
+    lng >= SI_BOUNDS.lngMin && lng <= SI_BOUNDS.lngMax
+  ).length;
+  return inSI / coords.length > 0.7;
+}
 
 function cellKey(lat: number, lng: number, step: number): string {
   return `${Math.floor(lat / step)},${Math.floor(lng / step)}`;
@@ -233,9 +246,12 @@ export function scoreGeometry(coords: [number, number][]): ScoringOutput {
     w.continuityPenalty * continuityPenalty +
     intersectionPenalty;
 
-  const { routeRawMin, routeRawMax } = _config.normalization;
+  const { routeRawMin, routeRawMax, statenIslandRawMin, statenIslandRawMax } = _config.normalization;
+  const si = isStatenIsland(coords);
+  const effectiveMin = (si && statenIslandRawMin != null) ? statenIslandRawMin : routeRawMin;
+  const effectiveMax = (si && statenIslandRawMax != null) ? statenIslandRawMax : routeRawMax;
   const normalized =
-    ((routeRaw - routeRawMin) / (routeRawMax - routeRawMin)) * 100;
+    ((routeRaw - effectiveMin) / (effectiveMax - effectiveMin)) * 100;
   const riskScore = Math.round(Math.min(99, Math.max(1, normalized)));
   const riskLevel: "low" | "medium" | "high" =
     riskScore < 40 ? "low" : riskScore < 70 ? "medium" : "high";

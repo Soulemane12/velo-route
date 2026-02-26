@@ -10,7 +10,9 @@
   "intersectionLambda": 0.08,
   "normalization": {
     "routeRawMin": 0.05,
-    "routeRawMax": 2.5
+    "routeRawMax": 2.5,
+    "statenIslandRawMin": 0.25,
+    "statenIslandRawMax": 0.55
   },
   "intersectionSearchRadiusDeg": 0.0003
 }

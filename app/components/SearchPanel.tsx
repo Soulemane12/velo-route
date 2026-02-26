@@ -30,12 +30,12 @@ const DEMO_PRESETS: DemoPreset[] = [
     destination: [-73.889547, 40.712783],
   },
   {
-    label: "St. George Ferry → Eibs Pond Park",
+    label: "New Dorp → Stapleton",
     kind: "risk",
-    originText: "St. George Ferry Terminal, Staten Island",
-    destText: "Eibs Pond Park, Staten Island",
-    origin: [-74.073076, 40.643649],
-    destination: [-74.082703, 40.611418],
+    originText: "New Dorp, Staten Island",
+    destText: "Stapleton, Staten Island",
+    origin: [-74.116000, 40.571000],
+    destination: [-74.077000, 40.629000],
   },
 ];
 
