@@ -29,6 +29,14 @@ const DEMO_PRESETS: DemoPreset[] = [
     origin: [-73.923728, 40.713194],
     destination: [-73.889547, 40.712783],
   },
+  {
+    label: "St. George Ferry → Chumenti Bldg",
+    kind: "risk",
+    originText: "St. George Ferry Terminal, Staten Island",
+    destText: "1865 Clove Rd, Staten Island",
+    origin: [-74.073076, 40.643649],
+    destination: [-74.101580, 40.624800],
+  },
 ];
 
 interface Props {
